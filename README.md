@@ -41,10 +41,9 @@ Details zu Steuergeräten, Formeln und Beobachtungen: [docs/ducato-obd-erkenntni
 
 
 1. `esphome/esphome-ble-obd.yaml` in ESPHome als neues Gerät übernehmen.
-2. `secrets.yaml` mit `wifi_ssid` und `wifi_password` anlegen (Vorlage: `esphome/secrets.yaml.example`).
+2. `secrets.yaml` mit `wifi_ssid`, `wifi_password` und `ap_password` (Fallback-Hotspot, mind. 8 Zeichen) anlegen (Vorlage: `esphome/secrets.yaml.example`).
 3. In den `substitutions` die eigene Adapter-MAC bei `fallback_mac` eintragen – oder `00:00:00:00:00:00` für die automatische Suche.
-4. **Fallback-Hotspot:** Das Passwort unter `wifi: ap:` ist ein Platzhalter (`12345678`) – vor dem Flashen ändern.
-5. Flashen, in Home Assistant hinzufügen, bei „Kilometerstand setzen“ einmal den Tachostand eintragen.
+4. Flashen, in Home Assistant hinzufügen, bei „Kilometerstand setzen“ einmal den Tachostand eintragen.
 
 > Die Header (`adblue_hdr`, `engine_rx`) und das Protokoll `ATSP7` (CAN 29 bit, 500 kbit/s) sind auf den Ducato zugeschnitten. Bei anderen Fahrzeugen zuerst den PID-Scan nutzen.
 
@@ -62,6 +61,14 @@ Voraussetzungen: [custom:button-card](https://github.com/custom-cards/button-car
 
 ## Versionen
 
-Jede Firmware-Version ist ein eigener Commit mit Tag (`v1.0` … `v1.12.2`). Die Änderungen stehen zusätzlich im Kopfkommentar von `esphome/esphome-ble-obd.yaml`.
+Die Änderungen jeder Firmware-Version stehen im Kopfkommentar von `esphome/esphome-ble-obd.yaml`.
 
-Letzte im Fahrzeug bei laufendem Motor geprüfte Version: **v1.10**. v1.12.1 verbindet sich nachweislich mit dem Adapter (Fahrzeug aus); v1.12.2 ändert nur die Anzeige der Adapter-MAC.
+Letzte im Fahrzeug bei laufendem Motor geprüfte Version: **v1.10**. v1.12.1 verbindet sich nachweislich mit dem Adapter (Fahrzeug aus); v1.12.2 ändert nur die Anzeige der Adapter-MAC, v1.12.3 holt das Hotspot-Passwort aus `secrets.yaml`.
+
+## Haftung
+
+Nutzung auf eigene Gefahr. Im Normalbetrieb fragt die Firmware nur Werte ab. Über „freier OBD-Befehl“ lässt sich aber jeder Befehl senden – `04` löscht zum Beispiel den Fehlerspeicher. Diagnose-Befehle nicht während der Fahrt senden.
+
+## Lizenz
+
+[MIT](LICENSE)

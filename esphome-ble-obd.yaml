@@ -1,0 +1,1119 @@
+# =================================================================
+# Ducato OBD BLE – Version 1.12.3
+# Änderungen gegenüber 1.12.2:
+#  - Passwort des Fallback-Hotspots kommt aus secrets.yaml (ap_password)
+#    statt fest im Code zu stehen -> Eintrag in secrets.yaml nötig!
+# Änderungen 1.12.2 gegenüber 1.12.1:
+#  - Eingabefeld "OBD-Adapter MAC (manuell)" zeigt die aktuell genutzte MAC
+#    statt "unknown"
+# Änderungen 1.12.1 gegenüber 1.12:
+#  - Fallback-MAC (substitutions: fallback_mac): ist kein Adapter gespeichert,
+#    verbindet sich der ESP mit dieser MAC wie bis v1.11. Die automatische
+#    Suche läuft nur, wenn fallback_mac auf 00:00:00:00:00:00 steht.
+# Änderungen 1.12 gegenüber 1.11:
+#  - Auto-Detect: keine feste MAC-Adresse mehr nötig. Der ESP sucht per
+#    Bluetooth nach OBD-Adaptern (Name enthält OBD, ELM, VLINK, VGATE, ICAR,
+#    VEEPEAK, KONNWEI, LELINK ...; Signal mindestens -75 dBm), merkt sich
+#    die MAC im Flash und verbindet sich danach immer mit diesem Adapter.
+#  - Mehrere Adapter-Typen: das Interface probiert beim ersten Verbinden die
+#    gängigen BLE-Profile durch und nimmt das, über das der Adapter antwortet:
+#      1 = Vgate iCar Pro      (E7810A71… / BEF8D6C9…)
+#      2 = ELM327-Klone, vLinker, Vgate iCar2 u. a. (FFF0 / FFF1 / FFF2)
+#      3 = ELM327-Klone, LELink u. a. (FFE0 / FFE1)
+#      4 = Veepeak, OBDLink u. a. (18F0 / 2AF0 / 2AF1)
+#    Profile 2–4 sind nach gängigen Angaben gebaut, aber nicht mit echten
+#    Adaptern getestet.
+#  - Neu in Home Assistant: Text "OBD-Adapter" (Name, MAC, Profil),
+#    Button "OBD-Adapter neu suchen", Eingabe "OBD-Adapter MAC (manuell)"
+#  - Hinweis: nur Bluetooth-LE-Adapter. "Klassische" Bluetooth-ELM327
+#    (Kopplung mit PIN 1234/0000, SPP) gehen nicht: der ESP32-C3 hat kein
+#    klassisches Bluetooth, und ESPHome bietet dafür keinen Client.
+#  - Wird der Adapter nicht gefunden (Name passt zu keinem Suchbegriff):
+#    MAC einmalig unter "OBD-Adapter MAC (manuell)" eintragen.
+# Änderungen 1.11 gegenüber 1.10:
+#  - km-Zähler 0131: Steuergerät 10 lehnt die physisch adressierte Abfrage
+#    (ATSH DA10F1) mit 7F 01 11 ab -> jetzt funktional (DB33F1) mit
+#    Empfangsfilter ATCRA 18DAF110, danach ATAR (wie AdBlue in v1.4)
+# Änderungen 1.10 gegenüber 1.9:
+#  - Öltemperatur (015C), Außentemperatur (0146), Kühlmittel (0105):
+#    Rohwert FF (= "kein gültiger Wert", ergab 215 °C) wird verworfen,
+#    ebenso Werte außerhalb des plausiblen Bereichs -> Anzeige "unbekannt"
+# Änderungen 1.9 gegenüber 1.8:
+#  - Kilometerstand: wird aus PID 0131 (km seit Fehlerspeicher-Löschen,
+#    physisch an Motorsteuergerät 10) fortgeschrieben. Startwert einmalig über
+#    "Kilometerstand setzen" in Home Assistant eintragen.
+#  - Tageskilometer mit Button "Tageskilometer zurücksetzen"
+#  - Beide Zähler überstehen Neustarts (im Flash gespeichert); Strecke, die
+#    gefahren wurde, während das Interface offline war, wird nachgetragen.
+#  - Fehlerspeicher gelöscht (0131 springt zurück) -> Zähler synchronisiert
+#    sich neu, es wird nichts doppelt oder negativ gezählt.
+# Änderungen 1.8 gegenüber 1.7:
+#  - Neue Sensoren (alle ~30 s): Außentemperatur (0146), Öltemperatur (015C),
+#    Luftdruck (0133), Rußpartikelfilter: Regeneration aktiv + Beladung (018B),
+#    Differenzdruck (017A)
+#  - Sparmodus erst nach 6 statt 3 Fehlantworten der Kernwerte in Folge
+#    (einzelne CAN ERROR direkt nach dem Aufwachen lösten ihn sonst aus)
+# Änderungen 1.7 gegenüber 1.6:
+#  - Neue Sensoren: Kraftstoffverbrauch (l/h und l/100 km, PID 019D),
+#    AdBlue-Temperatur und -Konzentration (PID 019B), Dieseltank (PID 012F)
+#  - Button "PID-Scan": fragt alle PID-Listen ab und schreibt lesbar ins Log,
+#    welches Steuergerät welche Werte liefert
+#  - Auswertung prüft jetzt die PID-Nummer direkt hinter "41" (vorher konnte
+#    z. B. "4105" zufällig mitten in anderen Daten gefunden werden)
+#  - NO DATA bei optionalen Werten löst keinen Sparmodus mehr aus
+#    (nur Drehzahl/Tempo/Kühlmittel/Weckprobe zählen)
+# Änderungen 1.6 gegenüber 1.5:
+#  - AdBlue-Abfrage hängt an jedem 10. Normalzyklus (~30 s) statt an einem
+#    eigenen Takt, der oft übersprungen wurde
+#  - Drehzahl unter 400 rpm wird als 0 gemeldet (eingefrorener Wert ~208 rpm
+#    bei Zündung an / Motor aus)
+# Änderungen 1.5 gegenüber 1.4:
+#  - AdBlue (0185) per physischer Adressierung direkt an Steuergerät 01
+#    (ATSH DA01F1 -> 0185 -> ATSH DB33F1) statt Empfangsfilter ATCRA
+# Änderungen 1.4 gegenüber 1.3:
+#  - Festes Protokoll ATSP7 (ISO 15765-4 CAN, 29 bit, 500 kbit)
+#  - Sparmodus: Spannung alle 15 s; ab 13,0 V sofort Normalbetrieb
+# Änderungen 1.3 gegenüber 1.2:
+#  - 0185: vermischte Antworten mehrerer Steuergeräte werden verworfen
+#  - Button "Diagnose: Steuergeräte-IDs"
+# Änderungen 1.2 gegenüber 1.1:
+#  - Senden wartet auf den ELM-Prompt '>' statt fester 400 ms
+# Änderungen 1.1 gegenüber 1.0:
+#  - Sparmodus, AdBlue-Sensor (0185), freie Befehlseingabe, Schalter
+#    "Vgate Verbindung", mehrzeilige Antworten (ISO-TP)
+# =================================================================
+
+substitutions:
+  # Header für die AdBlue-Abfrage (29 bit, Priorität 18 ist Standard):
+  #   DA01F1 = physisch an Steuergerät 01 (Antwort-ID 18DAF101)
+  #   Alternative: DA10F1 = Steuergerät 10 (liefert ebenfalls 0185)
+  adblue_hdr: "DA01F1"
+  # Standard-Header für alle anderen Abfragen (funktional, alle Steuergeräte)
+  default_hdr: "DB33F1"
+  # Empfangsfilter für den km-Zähler 0131: nur Antworten von Steuergerät 10
+  # (Steuergerät 18 liefert 0131 ebenfalls – nicht mischen; physische
+  # Abfrage per ATSH DA10F1 wird mit 7F 01 11 abgelehnt)
+  engine_rx: "18DAF110"
+  # Bekannter Adapter (Vgate iCar Pro). Für reine automatische Suche auf
+  # "00:00:00:00:00:00" setzen.
+  # Bisherige feste MAC des Vgate iCar Pro (bis v1.11): D2:E0:2F:8D:5B:5C
+  # -> bei Bedarf hier oder unter "OBD-Adapter MAC (manuell)" wieder eintragen.
+  fallback_mac: "D2:E0:2F:8D:5B:5C"
+
+esphome:
+  name: ducato-obd-ble
+  friendly_name: Ducato OBD BLE
+  project:
+    name: "ducato.obd-ble"
+    version: "1.12.3"
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // gespeicherten Adapter übernehmen
+          if (id(adapter_mac) != 0) {
+            id(vgate)->set_address(id(adapter_mac));
+            char buf[40];
+            uint64_t m = id(adapter_mac);
+            snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X (Profil %d)",
+                     (int)((m >> 40) & 0xFF), (int)((m >> 32) & 0xFF), (int)((m >> 24) & 0xFF),
+                     (int)((m >> 16) & 0xFF), (int)((m >> 8) & 0xFF), (int)(m & 0xFF),
+                     id(adapter_profile));
+            id(adapter_info).publish_state(buf);
+            ESP_LOGI("adapter", "Gespeicherter OBD-Adapter: %s", buf);
+          } else if (std::string("${fallback_mac}") != "00:00:00:00:00:00") {
+            id(adapter_info).publish_state("${fallback_mac} (fest eingestellt)");
+            ESP_LOGI("adapter", "Kein Adapter gespeichert – nutze fallback_mac ${fallback_mac}");
+          } else {
+            id(adapter_info).publish_state("Suche läuft …");
+            ESP_LOGI("adapter", "Kein OBD-Adapter gespeichert – Suche läuft");
+          }
+          if (id(odo_km) > 0) id(obd_odo).publish_state(id(odo_km));
+          id(obd_trip).publish_state(id(trip_km));
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+  logs:
+    script: INFO        # "queueing new instance" ausblenden
+    ble_sensor: INFO    # rohe NOTIFY-Events ausblenden
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Ducato-OBD-BLE"
+    password: !secret ap_password   # mind. 8 Zeichen
+
+captive_portal:
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            // ---- Auto-Detect: nur solange kein Adapter gespeichert ist ----
+            if (id(adapter_mac) != 0) return;
+            if (std::string("${fallback_mac}") != "00:00:00:00:00:00" && !id(search_active)) return;
+            std::string name = x.get_name();
+            if (name.empty()) return;
+            std::string up = name;
+            for (auto &ch : up) ch = toupper((unsigned char) ch);
+            static const char *const keys[] = {"OBD", "ELM", "VLINK", "V-LINK", "VGATE",
+                                               "ICAR", "VEEPEAK", "KONNWEI", "LELINK",
+                                               "CARLY", "BLUEDRIVER", "KIWI"};
+            bool match = false;
+            for (auto k : keys) if (up.find(k) != std::string::npos) { match = true; break; }
+            if (!match) return;
+            if (x.get_rssi() < -75) {
+              ESP_LOGD("adapter", "OBD-Adapter '%s' zu schwach (%d dBm) – ignoriert",
+                       name.c_str(), x.get_rssi());
+              return;
+            }
+            uint64_t mac = x.address_uint64();
+            id(adapter_mac) = mac;
+            id(adapter_profile) = 0;       // Profil beim Verbinden ermitteln
+            id(adapter_name) = name;
+            id(vgate)->set_address(mac);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s %02X:%02X:%02X:%02X:%02X:%02X",
+                     name.c_str(),
+                     (int)((mac >> 40) & 0xFF), (int)((mac >> 32) & 0xFF), (int)((mac >> 24) & 0xFF),
+                     (int)((mac >> 16) & 0xFF), (int)((mac >> 8) & 0xFF), (int)(mac & 0xFF));
+            id(adapter_info).publish_state(buf);
+            ESP_LOGI("adapter", "OBD-Adapter gefunden: %s, %d dBm – gespeichert", buf, x.get_rssi());
+
+# ---------------------------------------------------------------
+# Globale Variablen
+# ---------------------------------------------------------------
+globals:
+  - id: rx_buf
+    type: std::string
+    restore_value: no
+  - id: last_cmd             # zuletzt gesendeter Befehl
+    type: std::string
+    restore_value: no
+  - id: elm_ready            # ELM327 initialisiert
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: ecu_awake            # Motorsteuergerät antwortet
+    type: bool
+    restore_value: no
+    initial_value: "true"
+  - id: nodata_count         # aufeinanderfolgende NO DATA (nur Kernwerte)
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: pid85_checked        # 0180 schon abgefragt?
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: pid85_supported      # AdBlue-PID 0185 verfügbar?
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: awaiting_prompt      # Befehl gesendet, warte auf '>'
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: diag_mode            # Diagnose/Scan läuft: nur loggen, nicht auswerten
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: cycle_n              # Zähler der Normalzyklen (Zusatzwerte jeden 10.)
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: last_speed           # letzte Geschwindigkeit für l/100 km
+    type: float
+    restore_value: no
+    initial_value: "0"
+  - id: last_rpm             # letzte Drehzahl (0 = Motor aus)
+    type: float
+    restore_value: no
+    initial_value: "0"
+  - id: odo_km               # fortgeschriebener Kilometerstand
+    type: float
+    restore_value: yes
+    initial_value: "0"
+  - id: trip_km              # Tageskilometer
+    type: float
+    restore_value: yes
+    initial_value: "0"
+  - id: odo_last31           # letzter Wert von 0131 (-1 = noch keiner)
+    type: int
+    restore_value: yes
+    initial_value: "-1"
+  - id: adapter_mac          # MAC des gefundenen OBD-Adapters (0 = keiner)
+    type: uint64_t
+    restore_value: yes
+    initial_value: "0"
+  - id: adapter_profile      # BLE-Profil 1-4 (0 = noch unbekannt)
+    type: int
+    restore_value: yes
+    initial_value: "0"
+  - id: adapter_name
+    type: std::string
+    restore_value: no
+  - id: search_active        # "neu suchen" gedrückt (überstimmt fallback_mac)
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+# ---------------------------------------------------------------
+# BLE-Verbindung zum Vgate iCar Pro
+# ---------------------------------------------------------------
+ble_client:
+  # fallback_mac – wird vom Auto-Detect bzw. der manuellen Eingabe überschrieben
+  - mac_address: "${fallback_mac}"
+    id: vgate
+    auto_connect: true
+    on_connect:
+      then:
+        - logger.log: "Vgate verbunden – initialisiere ELM327"
+        - lambda: |-
+            id(elm_ready) = false;
+            id(ecu_awake) = true;
+            id(nodata_count) = 0;
+            id(pid85_checked) = false;
+            id(cycle_n) = 0;
+            id(rx_buf).clear();
+        - delay: 2s
+        - script.execute: { id: send_cmd, cmd: "ATZ" }
+        - delay: 1500ms
+        - script.execute: { id: send_cmd, cmd: "ATE0" }
+        - script.execute: { id: send_cmd, cmd: "ATL0" }
+        - script.execute: { id: send_cmd, cmd: "ATS0" }
+        - script.execute: { id: send_cmd, cmd: "ATH0" }
+        - script.execute: { id: send_cmd, cmd: "ATSP7" }   # CAN 29 bit / 500 kbit (Ducato)
+        - script.wait: send_cmd
+        - lambda: 'id(elm_ready) = true;'
+        - logger.log: "ELM327 bereit"
+    on_disconnect:
+      then:
+        - lambda: |-
+            id(elm_ready) = false;
+            id(awaiting_prompt) = false;
+        - logger.log: "Vgate getrennt"
+
+# ---------------------------------------------------------------
+# Senden
+# ---------------------------------------------------------------
+script:
+  - id: send_cmd
+    mode: queued
+    max_runs: 25
+    parameters:
+      cmd: string
+    then:
+      - lambda: |-
+          id(awaiting_prompt) = true;
+          id(last_cmd) = cmd;
+      - logger.log:
+          format: ">> %s"
+          args: [ 'cmd.c_str()' ]
+      # an das erkannte Profil schreiben (Profil 0 = noch unbekannt -> an alle)
+      - if:
+          condition:
+            lambda: 'return id(adapter_profile) == 0 || id(adapter_profile) == 1;'
+          then:
+            - ble_client.ble_write:
+                id: vgate
+                service_uuid: "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
+                characteristic_uuid: "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"
+                value: !lambda |-
+                  std::string s = cmd + "\r";
+                  return std::vector<uint8_t>(s.begin(), s.end());
+      - if:
+          condition:
+            lambda: 'return id(adapter_profile) == 0 || id(adapter_profile) == 2;'
+          then:
+            - ble_client.ble_write:
+                id: vgate
+                service_uuid: "FFF0"
+                characteristic_uuid: "FFF2"
+                value: !lambda |-
+                  std::string s = cmd + "\r";
+                  return std::vector<uint8_t>(s.begin(), s.end());
+      - if:
+          condition:
+            lambda: 'return id(adapter_profile) == 0 || id(adapter_profile) == 3;'
+          then:
+            - ble_client.ble_write:
+                id: vgate
+                service_uuid: "FFE0"
+                characteristic_uuid: "FFE1"
+                value: !lambda |-
+                  std::string s = cmd + "\r";
+                  return std::vector<uint8_t>(s.begin(), s.end());
+      - if:
+          condition:
+            lambda: 'return id(adapter_profile) == 0 || id(adapter_profile) == 4;'
+          then:
+            - ble_client.ble_write:
+                id: vgate
+                service_uuid: "18F0"
+                characteristic_uuid: "2AF1"
+                value: !lambda |-
+                  std::string s = cmd + "\r";
+                  return std::vector<uint8_t>(s.begin(), s.end());
+      # Warten, bis der ELM327 mit '>' fertig meldet
+      - wait_until:
+          condition:
+            lambda: 'return !id(awaiting_prompt);'
+          timeout: 12s
+      - if:
+          condition:
+            lambda: 'return id(awaiting_prompt);'
+          then:
+            - logger.log:
+                level: WARN
+                format: "Keine Antwort auf %s (Timeout)"
+                args: [ 'cmd.c_str()' ]
+            - lambda: 'id(awaiting_prompt) = false;'
+      - delay: 50ms
+
+  # Auswertung der empfangenen Bytes (aufgerufen von den Notify-Kanälen)
+  - id: rx_process
+    mode: queued
+    max_runs: 10
+    parameters:
+      data: string
+    then:
+      - lambda: |-
+          for (char c : data) {
+            if (c != '>') {
+              id(rx_buf) += (c == '\r' || c == '\n') ? ' ' : c;
+              if (id(rx_buf).size() > 768) id(rx_buf).clear();
+              continue;
+            }
+
+            // ---- komplette Antwort liegt vor ----
+            id(awaiting_prompt) = false;
+            std::string raw = id(rx_buf);
+            id(rx_buf).clear();
+            while (!raw.empty() && raw.back() == ' ') raw.pop_back();
+            while (!raw.empty() && raw.front() == ' ') raw.erase(0, 1);
+            if (raw.empty()) continue;
+            ESP_LOGD("obd", "<< '%s'", raw.c_str());
+
+            // In Zeilen zerlegen
+            std::vector<std::string> toks;
+            {
+              std::string t;
+              for (char ch : raw) {
+                if (ch == ' ') { if (!t.empty()) { toks.push_back(t); t.clear(); } }
+                else t += ch;
+              }
+              if (!t.empty()) toks.push_back(t);
+            }
+
+            // ---- Diagnose / PID-Scan (Header an): nur loggen + PID-Listen dekodieren ----
+            if (id(diag_mode)) {
+              ESP_LOGI("obd", "[Diagnose] %s", raw.c_str());
+              for (auto &t : toks) {
+                // Format: 18DAF1xx (Antwort-ID) + Länge + 41 + PID + 4 Byte Bitmaske
+                if (t.size() >= 22 && t.compare(0, 6, "18DAF1") == 0 && t.compare(10, 2, "41") == 0) {
+                  int base = (int) strtol(t.substr(12, 2).c_str(), nullptr, 16);
+                  if (base % 0x20 != 0) continue;
+                  uint32_t bits = (uint32_t) strtoul(t.substr(14, 8).c_str(), nullptr, 16);
+                  std::string list;
+                  char buf[6];
+                  for (int i = 0; i < 32; i++) {
+                    if (bits & (0x80000000u >> i)) {
+                      snprintf(buf, sizeof(buf), " %02X", base + 1 + i);
+                      list += buf;
+                    }
+                  }
+                  ESP_LOGI("obd", "[Scan] Steuergerät %s, PIDs %02X-%02X:%s",
+                           t.substr(6, 2).c_str(), base + 1, base + 0x20, list.c_str());
+                }
+              }
+              id(obd_last).publish_state(raw);
+              continue;
+            }
+
+            // ISO-TP-Zeilennummern ("0:", "1:") und Längenangabe ("00C") entfernen
+            std::string s;
+            for (auto &t : toks) {
+              if (t.size() >= 2 && t[1] == ':') { s += t.substr(2); continue; }
+              if (toks.size() > 1 && t.size() == 3 &&
+                  isxdigit(t[0]) && isxdigit(t[1]) && isxdigit(t[2])) continue;
+              s += t;
+            }
+            if (s.empty()) continue;
+
+            auto hb = [&](size_t pos) -> int {
+              return (int) strtol(s.substr(pos, 2).c_str(), nullptr, 16);
+            };
+            bool ecu_answer = false;   // Steuergerät hat geantwortet
+            bool routine = false;      // nicht als "letzte Antwort" melden
+            const std::string &lc = id(last_cmd);
+
+            if (s.back() == 'V' && s.size() <= 6) {
+              // ---- Bordspannung (ATRV) ----
+              float v = strtof(s.c_str(), nullptr);
+              id(obd_voltage).publish_state(v);
+              routine = true;
+              if (!id(ecu_awake) && v >= 13.0f) {
+                id(ecu_awake) = true;
+                id(nodata_count) = 0;
+                id(cycle_n) = 0;
+                ESP_LOGI("obd", "Bordspannung %.1f V -> Motor läuft, normale Abfrage", v);
+              }
+            } else if (s.size() >= 6 && s.compare(0, 2, "7F") == 0) {
+              // Negative Antwort: 7F + Dienst + Fehlercode (11 = Dienst nicht unterstützt)
+              ESP_LOGW("obd", "%s abgelehnt: %s", lc.c_str(), s.c_str());
+              routine = true;
+            } else if (s == "OK") {
+              routine = true;
+            } else if (s.find("STOPPED") != std::string::npos) {
+              ESP_LOGW("obd", "ELM327 meldet STOPPED – %s wurde unterbrochen", lc.c_str());
+              routine = true;
+            } else if (s.find("NODATA") != std::string::npos ||
+                       s.find("UNABLETOCONNECT") != std::string::npos ||
+                       s.find("CANERROR") != std::string::npos ||
+                       s.find("BUSINIT") != std::string::npos) {
+              routine = true;
+              bool core = (lc == "010C" || lc == "010D" || lc == "0105" || lc == "0100");
+              if (core) {
+                id(nodata_count)++;
+                if (id(nodata_count) >= 6 && id(ecu_awake)) {
+                  id(ecu_awake) = false;
+                  ESP_LOGI("obd", "Steuergerät antwortet nicht -> Sparmodus");
+                }
+              } else {
+                ESP_LOGD("obd", "%s: keine Daten (evtl. nicht unterstützt)", lc.c_str());
+              }
+            } else {
+              // ---- OBD-Antwort: "41" + PID + Daten ----
+              size_t p = s.find("41");
+              std::string pid = (p != std::string::npos && s.size() >= p + 4) ? s.substr(p + 2, 2) : "";
+              auto need = [&](size_t nbytes) { return s.size() >= p + 4 + nbytes * 2; };
+
+              if (pid == "0C" && need(2)) {
+                float rpm = (hb(p + 4) * 256 + hb(p + 6)) / 4.0f;
+                if (rpm < 400.0f) rpm = 0.0f;
+                id(last_rpm) = rpm;
+                id(obd_rpm).publish_state(rpm);
+                ecu_answer = true; routine = true;
+              } else if (pid == "0D" && need(1)) {
+                float sp = hb(p + 4);
+                id(last_speed) = sp;
+                id(obd_speed).publish_state(sp);
+                ecu_answer = true; routine = true;
+              } else if (pid == "05" && need(1)) {
+                int a = hb(p + 4);
+                if (a == 0xFF || a - 40 > 150) {
+                  ESP_LOGW("obd", "0105 Rohwert %02X ungültig – verworfen", a);
+                } else {
+                  id(obd_coolant).publish_state(a - 40);
+                }
+                ecu_answer = true; routine = true;
+              } else if (pid == "00" && need(4)) {
+                ESP_LOGI("obd", "Unterstützte PIDs 01-20: %s", s.substr(p + 4, 8).c_str());
+                ecu_answer = true;
+              } else if (pid == "80" && need(4)) {
+                int a = hb(p + 4);
+                id(pid85_supported) = (a & 0x08) != 0;   // Bit für PID 0x85
+                id(cycle_n) = 0;                          // Zusatzwerte gleich im nächsten Zyklus
+                ESP_LOGI("obd", "Unterstützte PIDs 81-A0: %s -> AdBlue-PID 0185 %s",
+                         s.substr(p + 4, 8).c_str(),
+                         id(pid85_supported) ? "VERFÜGBAR" : "nicht verfügbar");
+                ecu_answer = true;
+              } else if (pid == "85") {
+                // ---- AdBlue-Füllstand ----
+                ecu_answer = true;
+                bool multi = s.find("4185", p + 4) != std::string::npos;
+                bool err = s.find("ERROR") != std::string::npos;
+                if (multi || err || !need(10)) {
+                  ESP_LOGW("obd", "0185: mehrere Steuergeräte oder unvollständig – verworfen");
+                } else {
+                  // Daten A..J: A = unterstützte Felder, F = Tankfüllstand (100/255 %)
+                  int a = hb(p + 4);
+                  int f = hb(p + 14);
+                  if (a & 0x04) {
+                    id(obd_adblue).publish_state(f * 100.0f / 255.0f);
+                    ESP_LOGI("obd", "0185 %s -> AdBlue %.1f %%",
+                             s.substr(p + 4, 20).c_str(), f * 100.0f / 255.0f);
+                  } else {
+                    ESP_LOGW("obd", "0185: kein Tankfüllstand (A=%02X)", a);
+                  }
+                }
+              } else if (pid == "9D" && need(4)) {
+                // ---- Kraftstoffverbrauch: A-B = Motor-Kraftstoffmenge, 0,02 g/s je Bit ----
+                float gps = (hb(p + 4) * 256 + hb(p + 6)) * 0.02f;
+                float lph = gps * 3.6f / 0.835f;          // Diesel ~0,835 kg/l
+                if (id(last_rpm) == 0.0f) lph = 0.0f;
+                id(obd_fuel_rate).publish_state(lph);
+                if (id(last_speed) >= 5.0f) {
+                  id(obd_fuel_100).publish_state(lph / id(last_speed) * 100.0f);
+                }
+                ESP_LOGD("obd", "019D %s -> %.2f g/s = %.2f l/h",
+                         s.substr(p + 4, 8).c_str(), gps, lph);
+                ecu_answer = true; routine = true;
+              } else if (pid == "9B" && need(4)) {
+                // ---- AdBlue-Sensordaten: B = Konzentration (0,25 %/Bit),
+                //      C = Tanktemperatur (°C - 40), D = Füllstand (100/255 %) ----
+                int a = hb(p + 4), bb = hb(p + 6), cc = hb(p + 8), d = hb(p + 10);
+                id(obd_def_conc).publish_state(bb * 0.25f);
+                id(obd_def_temp).publish_state(cc - 40);
+                ESP_LOGI("obd", "019B %s -> Typ/Status %02X, Konzentration %.2f %%, "
+                                "Temperatur %d °C, Füllstand %.1f %%",
+                         s.substr(p + 4, 8).c_str(), a, bb * 0.25f, cc - 40, d * 100.0f / 255.0f);
+                ecu_answer = true; routine = true;
+              } else if (pid == "2F" && need(1)) {
+                // ---- Dieseltank: A * 100 / 255 % ----
+                int a = hb(p + 4);
+                id(obd_fuel_level).publish_state(a * 100.0f / 255.0f);
+                ESP_LOGI("obd", "012F -> Dieseltank %.1f %%", a * 100.0f / 255.0f);
+                ecu_answer = true; routine = true;
+              } else if (pid == "46" && need(1)) {
+                // ---- Außentemperatur: A - 40 (FF = ungültig) ----
+                int a = hb(p + 4);
+                if (a == 0xFF || a - 40 > 70) {
+                  ESP_LOGW("obd", "0146 Rohwert %02X ungültig – verworfen", a);
+                  id(obd_ambient).publish_state(NAN);
+                } else {
+                  id(obd_ambient).publish_state(a - 40);
+                }
+                ecu_answer = true; routine = true;
+              } else if (pid == "5C" && need(1)) {
+                // ---- Öltemperatur: A - 40 (FF = ungültig, ergab 215 °C) ----
+                int a = hb(p + 4);
+                if (a == 0xFF || a - 40 > 160) {
+                  ESP_LOGW("obd", "015C Rohwert %02X ungültig – verworfen", a);
+                  id(obd_oil).publish_state(NAN);
+                } else {
+                  ESP_LOGD("obd", "015C Rohwert %02X -> Öl %d °C", a, a - 40);
+                  id(obd_oil).publish_state(a - 40);
+                }
+                ecu_answer = true; routine = true;
+              } else if (pid == "33" && need(1)) {
+                // ---- Luftdruck: A kPa (1 kPa = 10 hPa Auflösung) ----
+                id(obd_baro).publish_state(hb(p + 4) * 10.0f);
+                ecu_answer = true; routine = true;
+              } else if (pid == "8B" && need(7)) {
+                // ---- Abgasnachbehandlung: A = gültige Felder, B = Status
+                //      (Bit 0 = DPF-Regeneration aktiv, Bit 1 = aktive Regeneration),
+                //      C = Regenerations-Auslöser 0-100 % (100/255),
+                //      D-E = Ø Minuten zwischen Regenerationen, F-G = Ø km dazwischen ----
+                int a = hb(p + 4), st = hb(p + 6), trig = hb(p + 8);
+                int tmin = hb(p + 10) * 256 + hb(p + 12);
+                int km = hb(p + 14) * 256 + hb(p + 16);
+                id(obd_dpf_regen).publish_state((st & 0x01) != 0);
+                id(obd_dpf_load).publish_state(trig * 100.0f / 255.0f);
+                ESP_LOGI("obd", "018B %s -> gültig %02X, Status %02X (Regeneration %s), "
+                                "Auslöser %.0f %%, Ø %d min / %d km zwischen Regenerationen",
+                         s.substr(p + 4, 14).c_str(), a, st, (st & 0x01) ? "AKTIV" : "aus",
+                         trig * 100.0f / 255.0f, tmin, km);
+                ecu_answer = true; routine = true;
+              } else if (pid == "31" && need(2)) {
+                // ---- km seit Fehlerspeicher-Löschen: A*256+B km -> Kilometerstand ----
+                if (s.find("4131", p + 4) != std::string::npos)
+                  ESP_LOGW("obd", "0131: mehrere Antworten (Filter greift nicht?) – nehme die erste");
+                int km = hb(p + 4) * 256 + hb(p + 6);
+                int last = id(odo_last31);
+                if (last >= 0) {
+                  int d = km - last;
+                  if (d > 0 && d <= 5000) {
+                    id(odo_km) += d;
+                    id(trip_km) += d;
+                  } else if (d != 0) {
+                    ESP_LOGW("obd", "0131 springt von %d auf %d km (Fehlerspeicher gelöscht?) "
+                                    "-> Zähler neu synchronisiert", last, km);
+                  }
+                } else {
+                  ESP_LOGI("obd", "0131 erster Wert %d km -> Zähler synchronisiert", km);
+                }
+                id(odo_last31) = km;
+                id(obd_dist_clr).publish_state(km);
+                if (id(odo_km) > 0) id(obd_odo).publish_state(id(odo_km));
+                id(obd_trip).publish_state(id(trip_km));
+                ecu_answer = true; routine = true;
+              } else if (pid == "7A" && need(3)) {
+                // ---- DPF Differenzdruck: A = gültige Felder, B-C = Δp (vorzeichenbehaftet,
+                //      0,01 kPa je Bit) -> mbar ----
+                int a = hb(p + 4);
+                int16_t raw_dp = (int16_t) (hb(p + 6) * 256 + hb(p + 8));
+                float mbar = raw_dp * 0.01f * 10.0f;
+                id(obd_dpf_dp).publish_state(mbar);
+                ESP_LOGI("obd", "017A %s -> gültig %02X, Differenzdruck %.1f mbar",
+                         s.substr(p + 4, need(7) ? 14 : 6).c_str(), a, mbar);
+                ecu_answer = true; routine = true;
+              }
+            }
+
+            if (ecu_answer) {
+              id(nodata_count) = 0;
+              if (!id(ecu_awake)) {
+                id(ecu_awake) = true;
+                id(cycle_n) = 0;
+                ESP_LOGI("obd", "Steuergerät aktiv -> normale Abfrage");
+              }
+              if (!id(pid85_checked)) {
+                id(pid85_checked) = true;
+                id(send_cmd)->execute(std::string("0180"));
+              }
+            }
+
+            if (!routine) id(obd_last).publish_state(raw);
+          }
+
+# ---------------------------------------------------------------
+# Empfangen und auswerten
+# ---------------------------------------------------------------
+sensor:
+  # Empfang: je BLE-Profil ein Notify-Kanal. Kanäle, die der Adapter nicht hat,
+  # melden beim Verbinden einmal "characteristic not found" – das ist normal.
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: vgate
+    id: adapter_rx1
+    internal: true
+    service_uuid: "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
+    characteristic_uuid: "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f"
+    notify: true
+    update_interval: never
+    lambda: |-
+      // Profil 1: Vgate iCar Pro
+      if (id(adapter_profile) == 0) {
+        id(adapter_profile) = 1;
+        ESP_LOGI("adapter", "Adapter antwortet über Profil 1 (Vgate iCar Pro) – gespeichert");
+        id(adapter_info).publish_state(id(adapter_info).state + " (Profil 1)");
+      }
+      if (id(adapter_profile) == 1) id(rx_process)->execute(std::string(x.begin(), x.end()));
+      return NAN;
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: vgate
+    id: adapter_rx2
+    internal: true
+    service_uuid: "FFF0"
+    characteristic_uuid: "FFF1"
+    notify: true
+    update_interval: never
+    lambda: |-
+      // Profil 2: FFF0/FFF1
+      if (id(adapter_profile) == 0) {
+        id(adapter_profile) = 2;
+        ESP_LOGI("adapter", "Adapter antwortet über Profil 2 (FFF0/FFF1) – gespeichert");
+        id(adapter_info).publish_state(id(adapter_info).state + " (Profil 2)");
+      }
+      if (id(adapter_profile) == 2) id(rx_process)->execute(std::string(x.begin(), x.end()));
+      return NAN;
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: vgate
+    id: adapter_rx3
+    internal: true
+    service_uuid: "FFE0"
+    characteristic_uuid: "FFE1"
+    notify: true
+    update_interval: never
+    lambda: |-
+      // Profil 3: FFE0/FFE1
+      if (id(adapter_profile) == 0) {
+        id(adapter_profile) = 3;
+        ESP_LOGI("adapter", "Adapter antwortet über Profil 3 (FFE0/FFE1) – gespeichert");
+        id(adapter_info).publish_state(id(adapter_info).state + " (Profil 3)");
+      }
+      if (id(adapter_profile) == 3) id(rx_process)->execute(std::string(x.begin(), x.end()));
+      return NAN;
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: vgate
+    id: adapter_rx4
+    internal: true
+    service_uuid: "18F0"
+    characteristic_uuid: "2AF0"
+    notify: true
+    update_interval: never
+    lambda: |-
+      // Profil 4: 18F0/2AF0
+      if (id(adapter_profile) == 0) {
+        id(adapter_profile) = 4;
+        ESP_LOGI("adapter", "Adapter antwortet über Profil 4 (18F0/2AF0) – gespeichert");
+        id(adapter_info).publish_state(id(adapter_info).state + " (Profil 4)");
+      }
+      if (id(adapter_profile) == 4) id(rx_process)->execute(std::string(x.begin(), x.end()));
+      return NAN;
+
+  - platform: template
+    name: "Drehzahl"
+    id: obd_rpm
+    unit_of_measurement: "rpm"
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Geschwindigkeit OBD"
+    id: obd_speed
+    unit_of_measurement: "km/h"
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Kühlmitteltemperatur"
+    id: obd_coolant
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Bordspannung"
+    id: obd_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+  - platform: template
+    name: "AdBlue Füllstand"
+    id: obd_adblue
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "AdBlue Temperatur"
+    id: obd_def_temp
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "AdBlue Konzentration"
+    id: obd_def_conc
+    unit_of_measurement: "%"
+    icon: mdi:flask-outline
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+  - platform: template
+    name: "Dieseltank"
+    id: obd_fuel_level
+    unit_of_measurement: "%"
+    icon: mdi:gas-station
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Kraftstoffverbrauch"
+    id: obd_fuel_rate
+    unit_of_measurement: "l/h"
+    icon: mdi:fuel
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+  - platform: template
+    name: "Verbrauch pro 100 km"
+    id: obd_fuel_100
+    unit_of_measurement: "l/100km"
+    icon: mdi:fuel
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+  - platform: template
+    name: "Außentemperatur"
+    id: obd_ambient
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Öltemperatur"
+    id: obd_oil
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Luftdruck"
+    id: obd_baro
+    unit_of_measurement: "hPa"
+    device_class: atmospheric_pressure
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "DPF Beladung"
+    id: obd_dpf_load
+    unit_of_measurement: "%"
+    icon: mdi:air-filter
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "DPF Differenzdruck"
+    id: obd_dpf_dp
+    unit_of_measurement: "mbar"
+    icon: mdi:gauge
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Kilometerstand"
+    id: obd_odo
+    unit_of_measurement: "km"
+    device_class: distance
+    state_class: total_increasing
+    icon: mdi:counter
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Tageskilometer"
+    id: obd_trip
+    unit_of_measurement: "km"
+    device_class: distance
+    state_class: total_increasing
+    icon: mdi:map-marker-distance
+    accuracy_decimals: 0
+    update_interval: never
+  - platform: template
+    name: "Strecke seit Fehlerspeicher-Löschen"
+    id: obd_dist_clr
+    unit_of_measurement: "km"
+    device_class: distance
+    icon: mdi:counter
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: never
+
+text_sensor:
+  - platform: template
+    name: "OBD letzte Antwort"
+    id: obd_last
+    icon: mdi:console
+  - platform: template
+    name: "OBD-Adapter"
+    id: adapter_info
+    icon: mdi:bluetooth-settings
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: template
+    name: "Motorsteuergerät aktiv"
+    lambda: 'return id(ecu_awake);'
+  - platform: template
+    name: "DPF Regeneration"
+    id: obd_dpf_regen
+    icon: mdi:fire
+
+# ---------------------------------------------------------------
+# Abfragezyklen
+# ---------------------------------------------------------------
+interval:
+  # Normalbetrieb: alle 3 s Drehzahl, Tempo, Kühlmittel, Verbrauch, Spannung.
+  # Jeder 10. Zyklus (~30 s) zusätzlich AdBlue, AdBlue-Sensordaten, Dieseltank,
+  # Außentemperatur, Öltemperatur, Luftdruck, Rußpartikelfilter, km-Zähler.
+  - interval: 3s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(elm_ready) && id(ecu_awake) && !id(send_cmd)->is_running();'
+          then:
+            - script.execute: { id: send_cmd, cmd: "010C" }
+            - script.execute: { id: send_cmd, cmd: "010D" }
+            - script.execute: { id: send_cmd, cmd: "0105" }
+            - script.execute: { id: send_cmd, cmd: "019D" }
+            - script.execute: { id: send_cmd, cmd: "ATRV" }
+            - if:
+                condition:
+                  lambda: 'return (id(cycle_n)++ % 10) == 0;'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(pid85_supported);'
+                      then:
+                        # AdBlue physisch adressiert (siehe substitutions)
+                        - script.execute: { id: send_cmd, cmd: "ATSH${adblue_hdr}" }
+                        - script.execute: { id: send_cmd, cmd: "0185" }
+                        - script.execute: { id: send_cmd, cmd: "ATSH${default_hdr}" }
+                  - script.execute: { id: send_cmd, cmd: "019B" }
+                  - script.execute: { id: send_cmd, cmd: "012F" }
+                  - script.execute: { id: send_cmd, cmd: "0146" }
+                  - script.execute: { id: send_cmd, cmd: "015C" }
+                  - script.execute: { id: send_cmd, cmd: "0133" }
+                  - script.execute: { id: send_cmd, cmd: "018B" }
+                  - script.execute: { id: send_cmd, cmd: "017A" }
+                  # km-Zähler: funktional, nur Antwort von Motorsteuergerät 10 annehmen
+                  - script.execute: { id: send_cmd, cmd: "ATCRA${engine_rx}" }
+                  - script.execute: { id: send_cmd, cmd: "0131" }
+                  - script.execute: { id: send_cmd, cmd: "ATAR" }
+
+  # Sparmodus: Spannung alle 15 s (belastet den CAN-Bus nicht)
+  - interval: 15s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(elm_ready) && !id(ecu_awake) && !id(send_cmd)->is_running();'
+          then:
+            - script.execute: { id: send_cmd, cmd: "ATRV" }
+
+  # Sparmodus: 1x pro Minute Weckprobe
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(elm_ready) && !id(ecu_awake) && !id(send_cmd)->is_running();'
+          then:
+            - script.execute: { id: send_cmd, cmd: "0100" }
+
+# ---------------------------------------------------------------
+# Bedienung aus Home Assistant
+# ---------------------------------------------------------------
+switch:
+  - platform: ble_client
+    ble_client_id: vgate
+    name: "Vgate Verbindung"
+    restore_mode: ALWAYS_ON
+
+number:
+  - platform: template
+    name: "Kilometerstand setzen"
+    icon: mdi:counter
+    entity_category: config
+    mode: box
+    min_value: 0
+    max_value: 999999
+    step: 1
+    unit_of_measurement: "km"
+    update_interval: 60s
+    lambda: 'return id(odo_km);'
+    set_action:
+      - lambda: |-
+          id(odo_km) = x;
+          id(obd_odo).publish_state(x);
+          ESP_LOGI("obd", "Kilometerstand auf %.0f km gesetzt", x);
+
+text:
+  - platform: template
+    name: "OBD-Adapter MAC (manuell)"
+    icon: mdi:bluetooth
+    entity_category: config
+    mode: text
+    max_length: 17
+    update_interval: 10s
+    lambda: |-
+      // aktuell genutzte MAC anzeigen (gespeichert, sonst fallback_mac)
+      uint64_t m = id(adapter_mac);
+      if (m == 0) {
+        if (id(search_active)) return std::string("");
+        return std::string("${fallback_mac}");
+      }
+      char buf[18];
+      snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+               (int)((m >> 40) & 0xFF), (int)((m >> 32) & 0xFF), (int)((m >> 24) & 0xFF),
+               (int)((m >> 16) & 0xFF), (int)((m >> 8) & 0xFF), (int)(m & 0xFF));
+      return std::string(buf);
+    set_action:
+      - lambda: |-
+          unsigned int b[6];
+          if (sscanf(x.c_str(), "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6) {
+            ESP_LOGW("adapter", "'%s' ist keine gültige MAC (Format AA:BB:CC:DD:EE:FF)", x.c_str());
+            return;
+          }
+          uint64_t mac = 0;
+          for (int i = 0; i < 6; i++) mac = (mac << 8) | (b[i] & 0xFF);
+          id(adapter_mac) = mac;
+          id(adapter_profile) = 0;
+          id(vgate)->disconnect();
+          id(vgate)->set_address(mac);
+          id(adapter_info).publish_state("manuell " + x);
+          ESP_LOGI("adapter", "OBD-Adapter manuell gesetzt: %s", x.c_str());
+  - platform: template
+    name: "OBD Befehl"
+    id: custom_cmd
+    optimistic: true
+    mode: text
+    max_length: 24
+    initial_value: "0185"
+
+button:
+  - platform: template
+    name: "OBD Befehl senden"
+    icon: mdi:send
+    on_press:
+      - script.execute:
+          id: send_cmd
+          cmd: !lambda 'return id(custom_cmd).state;'
+  - platform: template
+    name: "PID-Scan"
+    icon: mdi:magnify-scan
+    on_press:
+      - lambda: 'id(diag_mode) = true;'
+      - script.execute: { id: send_cmd, cmd: "ATH1" }
+      - script.execute: { id: send_cmd, cmd: "0100" }
+      - script.execute: { id: send_cmd, cmd: "0120" }
+      - script.execute: { id: send_cmd, cmd: "0140" }
+      - script.execute: { id: send_cmd, cmd: "0160" }
+      - script.execute: { id: send_cmd, cmd: "0180" }
+      - script.execute: { id: send_cmd, cmd: "01A0" }
+      - script.execute: { id: send_cmd, cmd: "01C0" }
+      - script.execute: { id: send_cmd, cmd: "ATH0" }
+      - script.wait: send_cmd
+      - lambda: 'id(diag_mode) = false;'
+      - logger.log: "PID-Scan beendet"
+  - platform: template
+    name: "Test 0185 (AdBlue Standard-PID)"
+    on_press:
+      - script.execute: { id: send_cmd, cmd: "ATSH${adblue_hdr}" }
+      - script.execute: { id: send_cmd, cmd: "0185" }
+      - script.execute: { id: send_cmd, cmd: "ATSH${default_hdr}" }
+  - platform: template
+    name: "Diagnose: Steuergeräte-IDs"
+    icon: mdi:car-cog
+    on_press:
+      - lambda: 'id(diag_mode) = true;'
+      - script.execute: { id: send_cmd, cmd: "ATH1" }
+      - script.execute: { id: send_cmd, cmd: "0100" }
+      - script.execute: { id: send_cmd, cmd: "0185" }
+      - script.execute: { id: send_cmd, cmd: "ATH0" }
+      - script.wait: send_cmd
+      - lambda: 'id(diag_mode) = false;'
+      - logger.log: "Diagnose beendet"
+  - platform: template
+    name: "Tageskilometer zurücksetzen"
+    icon: mdi:restart
+    on_press:
+      - lambda: |-
+          id(trip_km) = 0;
+          id(obd_trip).publish_state(0);
+  - platform: template
+    name: "OBD-Adapter neu suchen"
+    icon: mdi:bluetooth-audio
+    entity_category: config
+    on_press:
+      - lambda: |-
+          id(adapter_mac) = 0;
+          id(adapter_profile) = 0;
+          id(search_active) = true;
+          id(vgate)->disconnect();
+          id(vgate)->set_address(0);
+          id(adapter_info).publish_state("Suche läuft …");
+          ESP_LOGI("adapter", "Gespeicherter Adapter gelöscht – suche neu");
+  - platform: template
+    name: "Vgate ATZ senden"
+    on_press:
+      - script.execute: { id: send_cmd, cmd: "ATZ" }
