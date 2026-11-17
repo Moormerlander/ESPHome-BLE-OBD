@@ -1,0 +1,78 @@
+type: custom:button-card
+show_icon: false
+show_name: false
+show_state: false
+triggers_update:
+- sensor.pepper_ducato_obd_ble_kilometerstand
+- sun.sun
+- input_select.cockpit_farbschema
+tap_action:
+  action: more-info
+  entity: sensor.pepper_ducato_obd_ble_kilometerstand
+custom_fields:
+  c: |-
+    [[[
+    const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+    const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+    const p = lightMode ? {
+      accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+      track: '#e2d1b7', inactive: '#a89070'
+    } : {
+      accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+      track: '#292117', inactive: '#a89070'
+    };
+    const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+    const de = (v, d) => v.toFixed(d).replace('.', ',');
+    const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_kilometerstand'); return Number.isFinite(v) ? Math.round(v).toLocaleString('de-DE') : '--'; })();
+    const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_kilometerstand'); return Number.isFinite(v) ? p.accent : p.inactive; })();
+    return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+        <ha-icon icon="mdi:counter" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+      </div>
+      <div style="min-width:0;line-height:1;">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">Kilometerstand</div>
+        <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">km</span></div>
+      </div>
+    </div>`;
+    ]]]
+styles:
+  card:
+  - height: 64px
+  - border-radius: 18px
+  - padding: '0'
+  - box-sizing: border-box
+  - background: |-
+      [[[
+      const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+      const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+      return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+      ]]]
+  - border: |-
+      [[[
+      const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+      const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+      return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+      ]]]
+  - box-shadow: |-
+      [[[
+      const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+      const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+      return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+      ]]]
+  - color: |-
+      [[[
+      const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+      const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+      return lightMode ? '#30251a' : '#f0e4d4';
+      ]]]
+  grid:
+  - grid-template-areas: '"c"'
+  - grid-template-columns: minmax(0, 1fr)
+  - grid-template-rows: 1fr
+  custom_fields:
+    c:
+    - width: 100%
+    - height: 100%
+grid_options:
+  columns: 6
+  rows: auto

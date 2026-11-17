@@ -1,0 +1,1165 @@
+# =================================================================
+# OBD2-View im Stil des Cockpit-Views
+# - Farbschema folgt input_select.cockpit_farbschema (Hell / Dunkel / Automatisch)
+# - Benötigt custom:button-card (wie der Cockpit-View)
+# - Einfügen: Dashboard bearbeiten -> Raw-Konfigurationseditor -> den
+#   bisherigen OBD2-View (ab "- type: sections ... title: OBD2") durch
+#   diesen Block ersetzen (Einrückung: 2 Leerzeichen unter "views:")
+# - Passend zu ESPHome ducato-obd-ble v1.9
+# =================================================================
+  - type: sections
+    max_columns: 2
+    title: OBD2
+    path: obd2
+    icon: mdi:engine
+    sections:
+    - type: grid
+      column_span: 2
+      cards:
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - binary_sensor.pepper_ducato_obd_ble_motorsteuergerat_aktiv
+        - sensor.pepper_ducato_obd_ble_bordspannung
+        - switch.pepper_ducato_obd_ble_vgate_verbindung
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: none
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const ecu = states['binary_sensor.pepper_ducato_obd_ble_motorsteuergerat_aktiv']?.state;
+            const v = num('sensor.pepper_ducato_obd_ble_bordspannung');
+            let dot = '#777777', txt = 'OFFLINE';
+            if (ecu === 'on')  { dot = '#32d74b'; txt = 'MOTORSTEUERGERÄT AKTIV'; }
+            if (ecu === 'off') { dot = p.inactive; txt = 'RUHEMODUS'; }
+            const bt = states['switch.pepper_ducato_obd_ble_vgate_verbindung']?.state;
+            const btcol = bt === 'on' ? '#32d74b' : bt === 'off' ? p.inactive : '#777777';
+            const bttxt = bt === 'on' ? 'VGATE VERBUNDEN' : bt === 'off' ? 'VGATE GETRENNT' : 'VGATE --';
+            const vcol = !Number.isFinite(v) ? p.muted : v < 12 ? '#ff5d69' : v >= 13.2 ? '#32d74b' : p.text;
+            const pill = (inner, col) => `<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;background:${col}1f;border:1px solid ${col}55;font-size:10px;font-weight:800;letter-spacing:1.2px;color:${col};white-space:nowrap;">${inner}</div>`;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;height:100%;padding:0 4px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                <ha-icon icon="mdi:engine" style="--mdc-icon-size:28px;color:${p.accent};flex:none;"></ha-icon>
+                <div style="min-width:0;line-height:1.05;">
+                  <div style="font-size:20px;font-weight:800;letter-spacing:-.3px;color:${p.text};white-space:nowrap;">Ducato OBD</div>
+                  <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:${p.muted};margin-top:3px;white-space:nowrap;">VGATE ICAR PRO</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                ${pill(`<ha-icon icon="${bt === 'on' ? 'mdi:bluetooth-connect' : 'mdi:bluetooth-off'}" style="--mdc-icon-size:14px;"></ha-icon>${bttxt}`, btcol)}
+                ${pill(`<span style="width:8px;height:8px;border-radius:50%;background:${dot};box-shadow:0 0 8px ${dot};"></span>${txt}`, dot)}
+                ${pill(`<ha-icon icon="mdi:car-battery" style="--mdc-icon-size:14px;"></ha-icon>${Number.isFinite(v) ? de(v, 1) + ' V' : '-- V'}`, vcol)}
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 76px
+          - border-radius: 22px
+          - padding: 8px 14px
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 24
+          rows: auto
+      - type: custom:button-card
+        entity: sensor.pepper_ducato_obd_ble_adblue_fullstand
+        show_name: false
+        show_icon: false
+        show_state: false
+        tap_action:
+          action: more-info
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_adblue_fullstand
+        grid_options:
+          columns: 6
+          rows: auto
+        styles:
+          card:
+          - width: 100%
+          - aspect-ratio: 1 / 1
+          - padding: 0
+          - border-radius: 8%
+          - overflow: hidden
+          - background: '#1c1c1e'
+          - border: 1px solid rgba(255,255,255,0.08)
+          - box-shadow: none
+          grid:
+          - grid-template-areas: '"dial"'
+          - grid-template-columns: 1fr
+          - grid-template-rows: 1fr
+          custom_fields:
+            dial:
+            - width: 100%
+            - height: 100%
+        custom_fields:
+          dial: |-
+            [[[
+            var C = (function () {
+            var v = parseFloat(states['sensor.pepper_ducato_obd_ble_adblue_fullstand']?.state);
+            var ok = Number.isFinite(v);
+            var l = ok ? (v / 100 * 19) : NaN;
+            return { v: v, min: 0, max: 100, step: 25, labels: ['E', '¼', '½', '¾', 'F'],
+                     zones: [[0, 15, '#ff5364'], [15, 30, '#ffb52e']],
+                     text: ok ? Math.round(v) + '%' : '--', unit: 'ADBLUE',
+                     sub: ok ? '≈ ' + l.toFixed(1).replace('.', ',') + ' l' : '',
+                     col: !ok ? '#777' : v < 15 ? '#ff5364' : v < 30 ? '#ffb52e' : '#ffffff', icon: 'M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z' };
+            })();
+            var valid = Number.isFinite(C.v);
+            var val = valid ? Math.max(C.min, Math.min(C.max, C.v)) : C.min;
+            var WHT = '#ffffff', ACC = '#ff9f0a', MUT = '#c9b79e';
+            var F = 'font-family="Arial, Helvetica, sans-serif"';
+            var A0 = -125, A1 = 125;
+            var ang = function (x) { return A0 + (A1 - A0) * (x - C.min) / (C.max - C.min); };
+            var P = function (deg, r) { var a = deg * Math.PI / 180; return [r * Math.sin(a), -r * Math.cos(a)]; };
+            var arc = function (a1, a2, r, col, w) {
+              var p1 = P(a1, r), p2 = P(a2, r);
+              return '<path d="M ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 ' + ((a2 - a1) > 180 ? 1 : 0) + ' 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="butt"/>';
+            };
+            var s = [];
+            s.push('<svg viewBox="30 30 970 970" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">');
+            s.push('<defs>');
+            s.push('<radialGradient id="gFaceadb" gradientUnits="userSpaceOnUse" cx="0" cy="-120" r="640"><stop offset="0" stop-color="#2b2c31"/><stop offset="1" stop-color="#0e0e10"/></radialGradient>');
+            s.push('<linearGradient id="gBezeladb" gradientUnits="userSpaceOnUse" x1="-340" y1="-340" x2="340" y2="340"><stop offset="0" stop-color="#6b6d73"/><stop offset="0.45" stop-color="#2a2b2f"/><stop offset="1" stop-color="#0e0e10"/></linearGradient>');
+            s.push('<radialGradient id="gGlareadb" gradientUnits="userSpaceOnUse" cx="-120" cy="-260" r="260" gradientTransform="translate(-120 -260) rotate(-24) scale(1.3 0.58) translate(120 260)"><stop offset="0" stop-color="#fff" stop-opacity="0.13"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>');
+            s.push('<filter id="gShadowadb" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/></filter>');
+            s.push('<clipPath id="gDiscadb"><circle cx="0" cy="0" r="454"/></clipPath>');
+            s.push('</defs>');
+            s.push('<g transform="translate(512 514)">');
+            s.push('<circle cx="0" cy="0" r="468" fill="none" stroke="url(#gBezeladb)" stroke-width="27"/>');
+            s.push('<circle cx="0" cy="0" r="481" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1.5"/>');
+            s.push('<circle cx="0" cy="0" r="455" fill="none" stroke="#000" stroke-opacity="0.85" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="454" fill="url(#gFaceadb)"/>');
+            /* Farbzonen + Wertbogen */
+            s.push(arc(A0, A1, 412, '#ffffff22', 18));
+            for (var z = 0; z < (C.zones || []).length; z++) s.push(arc(ang(C.zones[z][0]), ang(C.zones[z][1]), 412, C.zones[z][2], 18));
+            if (valid && val > C.min) s.push(arc(A0, ang(val), 412, C.col || ACC, 18));
+            /* Skala */
+            var n = Math.round((C.max - C.min) / C.step);
+            for (var i = 0; i <= n * 2; i++) {
+              var x = C.min + i * C.step / 2, major = (i % 2 === 0);
+              var a = ang(x), q1 = P(a, 392), q2 = P(a, major ? 340 : 362);
+              s.push('<line x1="' + q1[0].toFixed(1) + '" y1="' + q1[1].toFixed(1) + '" x2="' + q2[0].toFixed(1) + '" y2="' + q2[1].toFixed(1) + '" stroke="' + WHT + '" stroke-width="' + (major ? 7 : 4) + '"/>');
+              if (major) {
+                var lbl = C.labels ? C.labels[i / 2] : String(x);
+                var t = P(a, 282);
+                s.push('<text x="' + t[0].toFixed(1) + '" y="' + (t[1] + 20).toFixed(1) + '" fill="' + WHT + '" font-size="58" font-weight="700" text-anchor="middle" ' + F + '>' + lbl + '</text>');
+              }
+            }
+            /* Anzeige */
+            if (C.icon) s.push('<g transform="translate(-36 -215) scale(3)"><path d="' + C.icon + '" fill="' + MUT + '" fill-opacity="0.75"/></g>');
+            s.push('<text x="0" y="205" fill="' + (valid ? (C.col || WHT) : '#777') + '" font-size="124" font-weight="800" text-anchor="middle" letter-spacing="-4" ' + F + '>' + (valid ? C.text : '--') + '</text>');
+            s.push('<text x="0" y="268" fill="' + MUT + '" font-size="40" font-weight="800" letter-spacing="5" text-anchor="middle" ' + F + '>' + C.unit + '</text>');
+            if (C.sub) s.push('<text x="0" y="345" fill="' + WHT + '" fill-opacity="0.85" font-size="46" font-weight="700" text-anchor="middle" ' + F + '>' + C.sub + '</text>');
+            /* Zeiger */
+            s.push('<g filter="url(#gShadowadb)" transform="rotate(' + ang(val).toFixed(2) + ')">');
+            s.push('<polygon points="-11,40 11,40 4,-380 -4,-380" fill="' + (valid ? ACC : '#777') + '"/>');
+            s.push('</g>');
+            s.push('<circle cx="0" cy="0" r="36" fill="#1b1b1e" stroke="#555" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="12" fill="' + (valid ? ACC : '#777') + '"/>');
+            /* Glas */
+            s.push('<g clip-path="url(#gDiscadb)"><ellipse cx="-120" cy="-260" rx="340" ry="150" transform="rotate(-24 -120 -260)" fill="url(#gGlareadb)"/></g>');
+            s.push('</g></svg>');
+            return s.join('');
+            ]]]
+      - type: custom:button-card
+        entity: sensor.pepper_ducato_obd_ble_dieseltank
+        show_name: false
+        show_icon: false
+        show_state: false
+        tap_action:
+          action: more-info
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_dieseltank
+        grid_options:
+          columns: 6
+          rows: auto
+        styles:
+          card:
+          - width: 100%
+          - aspect-ratio: 1 / 1
+          - padding: 0
+          - border-radius: 8%
+          - overflow: hidden
+          - background: '#1c1c1e'
+          - border: 1px solid rgba(255,255,255,0.08)
+          - box-shadow: none
+          grid:
+          - grid-template-areas: '"dial"'
+          - grid-template-columns: 1fr
+          - grid-template-rows: 1fr
+          custom_fields:
+            dial:
+            - width: 100%
+            - height: 100%
+        custom_fields:
+          dial: |-
+            [[[
+            var C = (function () {
+            var v = parseFloat(states['sensor.pepper_ducato_obd_ble_dieseltank']?.state);
+            var ok = Number.isFinite(v);
+            var l = ok ? (v / 100 * 90) : NaN;
+            return { v: v, min: 0, max: 100, step: 25, labels: ['E', '¼', '½', '¾', 'F'],
+                     zones: [[0, 10, '#ff5364'], [10, 20, '#ffb52e']],
+                     text: ok ? Math.round(v) + '%' : '--', unit: 'DIESEL',
+                     sub: ok ? '≈ ' + l.toFixed(0).replace('.', ',') + ' l' : '',
+                     col: !ok ? '#777' : v < 10 ? '#ff5364' : v < 20 ? '#ffb52e' : '#ffffff', icon: 'M18,10A1,1 0 0,1 17,9A1,1 0 0,1 18,8A1,1 0 0,1 19,9A1,1 0 0,1 18,10M12,10H6V5H12M19.77,7.23L19.78,7.22L16.06,3.5L15,4.56L17.11,6.67C16.17,7 15.5,7.93 15.5,9A2.5,2.5 0 0,0 18,11.5C18.36,11.5 18.69,11.42 19,11.29V18.5A1,1 0 0,1 18,19.5A1,1 0 0,1 17,18.5V14A2,2 0 0,0 15,12H14V5A2,2 0 0,0 12,3H6A2,2 0 0,0 4,5V21H14V13.5H15.5V18.5A2.5,2.5 0 0,0 18,21A2.5,2.5 0 0,0 20.5,18.5V9C20.5,8.31 20.22,7.68 19.77,7.23Z' };
+            })();
+            var valid = Number.isFinite(C.v);
+            var val = valid ? Math.max(C.min, Math.min(C.max, C.v)) : C.min;
+            var WHT = '#ffffff', ACC = '#ff9f0a', MUT = '#c9b79e';
+            var F = 'font-family="Arial, Helvetica, sans-serif"';
+            var A0 = -125, A1 = 125;
+            var ang = function (x) { return A0 + (A1 - A0) * (x - C.min) / (C.max - C.min); };
+            var P = function (deg, r) { var a = deg * Math.PI / 180; return [r * Math.sin(a), -r * Math.cos(a)]; };
+            var arc = function (a1, a2, r, col, w) {
+              var p1 = P(a1, r), p2 = P(a2, r);
+              return '<path d="M ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 ' + ((a2 - a1) > 180 ? 1 : 0) + ' 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="butt"/>';
+            };
+            var s = [];
+            s.push('<svg viewBox="30 30 970 970" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">');
+            s.push('<defs>');
+            s.push('<radialGradient id="gFacedsl" gradientUnits="userSpaceOnUse" cx="0" cy="-120" r="640"><stop offset="0" stop-color="#2b2c31"/><stop offset="1" stop-color="#0e0e10"/></radialGradient>');
+            s.push('<linearGradient id="gBezeldsl" gradientUnits="userSpaceOnUse" x1="-340" y1="-340" x2="340" y2="340"><stop offset="0" stop-color="#6b6d73"/><stop offset="0.45" stop-color="#2a2b2f"/><stop offset="1" stop-color="#0e0e10"/></linearGradient>');
+            s.push('<radialGradient id="gGlaredsl" gradientUnits="userSpaceOnUse" cx="-120" cy="-260" r="260" gradientTransform="translate(-120 -260) rotate(-24) scale(1.3 0.58) translate(120 260)"><stop offset="0" stop-color="#fff" stop-opacity="0.13"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>');
+            s.push('<filter id="gShadowdsl" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/></filter>');
+            s.push('<clipPath id="gDiscdsl"><circle cx="0" cy="0" r="454"/></clipPath>');
+            s.push('</defs>');
+            s.push('<g transform="translate(512 514)">');
+            s.push('<circle cx="0" cy="0" r="468" fill="none" stroke="url(#gBezeldsl)" stroke-width="27"/>');
+            s.push('<circle cx="0" cy="0" r="481" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1.5"/>');
+            s.push('<circle cx="0" cy="0" r="455" fill="none" stroke="#000" stroke-opacity="0.85" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="454" fill="url(#gFacedsl)"/>');
+            /* Farbzonen + Wertbogen */
+            s.push(arc(A0, A1, 412, '#ffffff22', 18));
+            for (var z = 0; z < (C.zones || []).length; z++) s.push(arc(ang(C.zones[z][0]), ang(C.zones[z][1]), 412, C.zones[z][2], 18));
+            if (valid && val > C.min) s.push(arc(A0, ang(val), 412, C.col || ACC, 18));
+            /* Skala */
+            var n = Math.round((C.max - C.min) / C.step);
+            for (var i = 0; i <= n * 2; i++) {
+              var x = C.min + i * C.step / 2, major = (i % 2 === 0);
+              var a = ang(x), q1 = P(a, 392), q2 = P(a, major ? 340 : 362);
+              s.push('<line x1="' + q1[0].toFixed(1) + '" y1="' + q1[1].toFixed(1) + '" x2="' + q2[0].toFixed(1) + '" y2="' + q2[1].toFixed(1) + '" stroke="' + WHT + '" stroke-width="' + (major ? 7 : 4) + '"/>');
+              if (major) {
+                var lbl = C.labels ? C.labels[i / 2] : String(x);
+                var t = P(a, 282);
+                s.push('<text x="' + t[0].toFixed(1) + '" y="' + (t[1] + 20).toFixed(1) + '" fill="' + WHT + '" font-size="58" font-weight="700" text-anchor="middle" ' + F + '>' + lbl + '</text>');
+              }
+            }
+            /* Anzeige */
+            if (C.icon) s.push('<g transform="translate(-36 -215) scale(3)"><path d="' + C.icon + '" fill="' + MUT + '" fill-opacity="0.75"/></g>');
+            s.push('<text x="0" y="205" fill="' + (valid ? (C.col || WHT) : '#777') + '" font-size="124" font-weight="800" text-anchor="middle" letter-spacing="-4" ' + F + '>' + (valid ? C.text : '--') + '</text>');
+            s.push('<text x="0" y="268" fill="' + MUT + '" font-size="40" font-weight="800" letter-spacing="5" text-anchor="middle" ' + F + '>' + C.unit + '</text>');
+            if (C.sub) s.push('<text x="0" y="345" fill="' + WHT + '" fill-opacity="0.85" font-size="46" font-weight="700" text-anchor="middle" ' + F + '>' + C.sub + '</text>');
+            /* Zeiger */
+            s.push('<g filter="url(#gShadowdsl)" transform="rotate(' + ang(val).toFixed(2) + ')">');
+            s.push('<polygon points="-11,40 11,40 4,-380 -4,-380" fill="' + (valid ? ACC : '#777') + '"/>');
+            s.push('</g>');
+            s.push('<circle cx="0" cy="0" r="36" fill="#1b1b1e" stroke="#555" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="12" fill="' + (valid ? ACC : '#777') + '"/>');
+            /* Glas */
+            s.push('<g clip-path="url(#gDiscdsl)"><ellipse cx="-120" cy="-260" rx="340" ry="150" transform="rotate(-24 -120 -260)" fill="url(#gGlaredsl)"/></g>');
+            s.push('</g></svg>');
+            return s.join('');
+            ]]]
+      - type: custom:button-card
+        entity: sensor.pepper_ducato_obd_ble_verbrauch_pro_100_km
+        show_name: false
+        show_icon: false
+        show_state: false
+        tap_action:
+          action: more-info
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_geschwindigkeit_obd
+        - sensor.pepper_ducato_obd_ble_verbrauch_pro_100_km
+        grid_options:
+          columns: 6
+          rows: auto
+        styles:
+          card:
+          - width: 100%
+          - aspect-ratio: 1 / 1
+          - padding: 0
+          - border-radius: 8%
+          - overflow: hidden
+          - background: '#1c1c1e'
+          - border: 1px solid rgba(255,255,255,0.08)
+          - box-shadow: none
+          grid:
+          - grid-template-areas: '"dial"'
+          - grid-template-columns: 1fr
+          - grid-template-rows: 1fr
+          custom_fields:
+            dial:
+            - width: 100%
+            - height: 100%
+        custom_fields:
+          dial: |-
+            [[[
+            var C = (function () {
+            var n = function (id) { var v = parseFloat(states[id]?.state); return Number.isFinite(v) ? v : NaN; };
+            var sp = n('sensor.pepper_ducato_obd_ble_geschwindigkeit_obd'), l100 = n('sensor.pepper_ducato_obd_ble_verbrauch_pro_100_km');
+            var moving = Number.isFinite(sp) && sp >= 5;
+            return { v: l100, min: 0, max: 25, step: 5, zones: [[15, 25, '#ff5364']],
+                     text: Number.isFinite(l100) ? l100.toFixed(1).replace('.', ',') : '--', unit: 'L/100 KM',
+                     sub: moving ? '' : (Number.isFinite(l100) ? 'zuletzt in Fahrt' : ''),
+                     col: !Number.isFinite(l100) ? '#777' : l100 >= 15 ? '#ff5364' : l100 >= 11 ? '#ffb52e' : '#ffffff', icon: 'M3,2H6C6.28,2 6.53,2.11 6.71,2.29L8.79,4.38L9.59,3.59C10,3.2 10.5,3 11,3H17C17.5,3 18,3.2 18.41,3.59L19.41,4.59C19.8,5 20,5.5 20,6V19A2,2 0 0,1 18,21H8A2,2 0 0,1 6,19V13L6,12V8C6,7.5 6.2,7 6.59,6.59L7.38,5.79L5.59,4H3V2M11,5V7H17V5H11M11.41,11L9.41,9H8V10.41L10,12.41V15.59L8,17.59V19H9.41L11.41,17H14.59L16.59,19H18V17.59L16,15.59V12.41L18,10.41V9H16.59L14.59,11H11.41M12,13H14V15H12V13Z' };
+            })();
+            var valid = Number.isFinite(C.v);
+            var val = valid ? Math.max(C.min, Math.min(C.max, C.v)) : C.min;
+            var WHT = '#ffffff', ACC = '#ff9f0a', MUT = '#c9b79e';
+            var F = 'font-family="Arial, Helvetica, sans-serif"';
+            var A0 = -125, A1 = 125;
+            var ang = function (x) { return A0 + (A1 - A0) * (x - C.min) / (C.max - C.min); };
+            var P = function (deg, r) { var a = deg * Math.PI / 180; return [r * Math.sin(a), -r * Math.cos(a)]; };
+            var arc = function (a1, a2, r, col, w) {
+              var p1 = P(a1, r), p2 = P(a2, r);
+              return '<path d="M ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 ' + ((a2 - a1) > 180 ? 1 : 0) + ' 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="butt"/>';
+            };
+            var s = [];
+            s.push('<svg viewBox="30 30 970 970" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">');
+            s.push('<defs>');
+            s.push('<radialGradient id="gFacel100" gradientUnits="userSpaceOnUse" cx="0" cy="-120" r="640"><stop offset="0" stop-color="#2b2c31"/><stop offset="1" stop-color="#0e0e10"/></radialGradient>');
+            s.push('<linearGradient id="gBezell100" gradientUnits="userSpaceOnUse" x1="-340" y1="-340" x2="340" y2="340"><stop offset="0" stop-color="#6b6d73"/><stop offset="0.45" stop-color="#2a2b2f"/><stop offset="1" stop-color="#0e0e10"/></linearGradient>');
+            s.push('<radialGradient id="gGlarel100" gradientUnits="userSpaceOnUse" cx="-120" cy="-260" r="260" gradientTransform="translate(-120 -260) rotate(-24) scale(1.3 0.58) translate(120 260)"><stop offset="0" stop-color="#fff" stop-opacity="0.13"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>');
+            s.push('<filter id="gShadowl100" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/></filter>');
+            s.push('<clipPath id="gDiscl100"><circle cx="0" cy="0" r="454"/></clipPath>');
+            s.push('</defs>');
+            s.push('<g transform="translate(512 514)">');
+            s.push('<circle cx="0" cy="0" r="468" fill="none" stroke="url(#gBezell100)" stroke-width="27"/>');
+            s.push('<circle cx="0" cy="0" r="481" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1.5"/>');
+            s.push('<circle cx="0" cy="0" r="455" fill="none" stroke="#000" stroke-opacity="0.85" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="454" fill="url(#gFacel100)"/>');
+            /* Farbzonen + Wertbogen */
+            s.push(arc(A0, A1, 412, '#ffffff22', 18));
+            for (var z = 0; z < (C.zones || []).length; z++) s.push(arc(ang(C.zones[z][0]), ang(C.zones[z][1]), 412, C.zones[z][2], 18));
+            if (valid && val > C.min) s.push(arc(A0, ang(val), 412, C.col || ACC, 18));
+            /* Skala */
+            var n = Math.round((C.max - C.min) / C.step);
+            for (var i = 0; i <= n * 2; i++) {
+              var x = C.min + i * C.step / 2, major = (i % 2 === 0);
+              var a = ang(x), q1 = P(a, 392), q2 = P(a, major ? 340 : 362);
+              s.push('<line x1="' + q1[0].toFixed(1) + '" y1="' + q1[1].toFixed(1) + '" x2="' + q2[0].toFixed(1) + '" y2="' + q2[1].toFixed(1) + '" stroke="' + WHT + '" stroke-width="' + (major ? 7 : 4) + '"/>');
+              if (major) {
+                var lbl = C.labels ? C.labels[i / 2] : String(x);
+                var t = P(a, 282);
+                s.push('<text x="' + t[0].toFixed(1) + '" y="' + (t[1] + 20).toFixed(1) + '" fill="' + WHT + '" font-size="58" font-weight="700" text-anchor="middle" ' + F + '>' + lbl + '</text>');
+              }
+            }
+            /* Anzeige */
+            if (C.icon) s.push('<g transform="translate(-36 -215) scale(3)"><path d="' + C.icon + '" fill="' + MUT + '" fill-opacity="0.75"/></g>');
+            s.push('<text x="0" y="205" fill="' + (valid ? (C.col || WHT) : '#777') + '" font-size="124" font-weight="800" text-anchor="middle" letter-spacing="-4" ' + F + '>' + (valid ? C.text : '--') + '</text>');
+            s.push('<text x="0" y="268" fill="' + MUT + '" font-size="40" font-weight="800" letter-spacing="5" text-anchor="middle" ' + F + '>' + C.unit + '</text>');
+            if (C.sub) s.push('<text x="0" y="345" fill="' + WHT + '" fill-opacity="0.85" font-size="46" font-weight="700" text-anchor="middle" ' + F + '>' + C.sub + '</text>');
+            /* Zeiger */
+            s.push('<g filter="url(#gShadowl100)" transform="rotate(' + ang(val).toFixed(2) + ')">');
+            s.push('<polygon points="-11,40 11,40 4,-380 -4,-380" fill="' + (valid ? ACC : '#777') + '"/>');
+            s.push('</g>');
+            s.push('<circle cx="0" cy="0" r="36" fill="#1b1b1e" stroke="#555" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="12" fill="' + (valid ? ACC : '#777') + '"/>');
+            /* Glas */
+            s.push('<g clip-path="url(#gDiscl100)"><ellipse cx="-120" cy="-260" rx="340" ry="150" transform="rotate(-24 -120 -260)" fill="url(#gGlarel100)"/></g>');
+            s.push('</g></svg>');
+            return s.join('');
+            ]]]
+      - type: custom:button-card
+        entity: sensor.pepper_ducato_obd_ble_drehzahl
+        show_name: false
+        show_icon: false
+        show_state: false
+        tap_action:
+          action: more-info
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_drehzahl
+        - sensor.pepper_ducato_obd_ble_geschwindigkeit_obd
+        grid_options:
+          columns: 6
+          rows: auto
+        styles:
+          card:
+          - width: 100%
+          - aspect-ratio: 1 / 1
+          - padding: 0
+          - border-radius: 8%
+          - overflow: hidden
+          - background: '#1c1c1e'
+          - border: 1px solid rgba(255,255,255,0.08)
+          - box-shadow: none
+          grid:
+          - grid-template-areas: '"dial"'
+          - grid-template-columns: 1fr
+          - grid-template-rows: 1fr
+          custom_fields:
+            dial:
+            - width: 100%
+            - height: 100%
+        custom_fields:
+          dial: |-
+            [[[
+            var C = (function () {
+            var v = parseFloat(states['sensor.pepper_ducato_obd_ble_drehzahl']?.state);
+            var sp = parseFloat(states['sensor.pepper_ducato_obd_ble_geschwindigkeit_obd']?.state);
+            var ok = Number.isFinite(v);
+            return { v: v, min: 0, max: 5000, step: 1000, labels: ['0', '1', '2', '3', '4', '5'],
+                     zones: [[3500, 4200, '#ffb52e'], [4200, 5000, '#ff5364']],
+                     text: ok ? String(Math.round(v)) : '--', unit: 'U/MIN',
+                     sub: Number.isFinite(sp) ? Math.round(sp) + ' km/h' : '',
+                     col: !ok ? '#777' : v >= 4200 ? '#ff5364' : v >= 3500 ? '#ffb52e' : '#ffffff', icon: 'M7,4H17V6H15V8H18A2,2 0 0,1 20,10V12H22V18H20V20A2,2 0 0,1 18,22H8A2,2 0 0,1 6,20V18H4V15H2V12H4V9A2,2 0 0,1 6,7H7V6H5V4H7M9,8V6H13V8H9Z' };
+            })();
+            var valid = Number.isFinite(C.v);
+            var val = valid ? Math.max(C.min, Math.min(C.max, C.v)) : C.min;
+            var WHT = '#ffffff', ACC = '#ff9f0a', MUT = '#c9b79e';
+            var F = 'font-family="Arial, Helvetica, sans-serif"';
+            var A0 = -125, A1 = 125;
+            var ang = function (x) { return A0 + (A1 - A0) * (x - C.min) / (C.max - C.min); };
+            var P = function (deg, r) { var a = deg * Math.PI / 180; return [r * Math.sin(a), -r * Math.cos(a)]; };
+            var arc = function (a1, a2, r, col, w) {
+              var p1 = P(a1, r), p2 = P(a2, r);
+              return '<path d="M ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) + ' A ' + r + ' ' + r + ' 0 ' + ((a2 - a1) > 180 ? 1 : 0) + ' 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="butt"/>';
+            };
+            var s = [];
+            s.push('<svg viewBox="30 30 970 970" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">');
+            s.push('<defs>');
+            s.push('<radialGradient id="gFacerpm" gradientUnits="userSpaceOnUse" cx="0" cy="-120" r="640"><stop offset="0" stop-color="#2b2c31"/><stop offset="1" stop-color="#0e0e10"/></radialGradient>');
+            s.push('<linearGradient id="gBezelrpm" gradientUnits="userSpaceOnUse" x1="-340" y1="-340" x2="340" y2="340"><stop offset="0" stop-color="#6b6d73"/><stop offset="0.45" stop-color="#2a2b2f"/><stop offset="1" stop-color="#0e0e10"/></linearGradient>');
+            s.push('<radialGradient id="gGlarerpm" gradientUnits="userSpaceOnUse" cx="-120" cy="-260" r="260" gradientTransform="translate(-120 -260) rotate(-24) scale(1.3 0.58) translate(120 260)"><stop offset="0" stop-color="#fff" stop-opacity="0.13"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>');
+            s.push('<filter id="gShadowrpm" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/></filter>');
+            s.push('<clipPath id="gDiscrpm"><circle cx="0" cy="0" r="454"/></clipPath>');
+            s.push('</defs>');
+            s.push('<g transform="translate(512 514)">');
+            s.push('<circle cx="0" cy="0" r="468" fill="none" stroke="url(#gBezelrpm)" stroke-width="27"/>');
+            s.push('<circle cx="0" cy="0" r="481" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1.5"/>');
+            s.push('<circle cx="0" cy="0" r="455" fill="none" stroke="#000" stroke-opacity="0.85" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="454" fill="url(#gFacerpm)"/>');
+            /* Farbzonen + Wertbogen */
+            s.push(arc(A0, A1, 412, '#ffffff22', 18));
+            for (var z = 0; z < (C.zones || []).length; z++) s.push(arc(ang(C.zones[z][0]), ang(C.zones[z][1]), 412, C.zones[z][2], 18));
+            if (valid && val > C.min) s.push(arc(A0, ang(val), 412, C.col || ACC, 18));
+            /* Skala */
+            var n = Math.round((C.max - C.min) / C.step);
+            for (var i = 0; i <= n * 2; i++) {
+              var x = C.min + i * C.step / 2, major = (i % 2 === 0);
+              var a = ang(x), q1 = P(a, 392), q2 = P(a, major ? 340 : 362);
+              s.push('<line x1="' + q1[0].toFixed(1) + '" y1="' + q1[1].toFixed(1) + '" x2="' + q2[0].toFixed(1) + '" y2="' + q2[1].toFixed(1) + '" stroke="' + WHT + '" stroke-width="' + (major ? 7 : 4) + '"/>');
+              if (major) {
+                var lbl = C.labels ? C.labels[i / 2] : String(x);
+                var t = P(a, 282);
+                s.push('<text x="' + t[0].toFixed(1) + '" y="' + (t[1] + 20).toFixed(1) + '" fill="' + WHT + '" font-size="58" font-weight="700" text-anchor="middle" ' + F + '>' + lbl + '</text>');
+              }
+            }
+            /* Anzeige */
+            if (C.icon) s.push('<g transform="translate(-36 -215) scale(3)"><path d="' + C.icon + '" fill="' + MUT + '" fill-opacity="0.75"/></g>');
+            s.push('<text x="0" y="205" fill="' + (valid ? (C.col || WHT) : '#777') + '" font-size="124" font-weight="800" text-anchor="middle" letter-spacing="-4" ' + F + '>' + (valid ? C.text : '--') + '</text>');
+            s.push('<text x="0" y="268" fill="' + MUT + '" font-size="40" font-weight="800" letter-spacing="5" text-anchor="middle" ' + F + '>' + C.unit + '</text>');
+            if (C.sub) s.push('<text x="0" y="345" fill="' + WHT + '" fill-opacity="0.85" font-size="46" font-weight="700" text-anchor="middle" ' + F + '>' + C.sub + '</text>');
+            /* Zeiger */
+            s.push('<g filter="url(#gShadowrpm)" transform="rotate(' + ang(val).toFixed(2) + ')">');
+            s.push('<polygon points="-11,40 11,40 4,-380 -4,-380" fill="' + (valid ? ACC : '#777') + '"/>');
+            s.push('</g>');
+            s.push('<circle cx="0" cy="0" r="36" fill="#1b1b1e" stroke="#555" stroke-width="4"/>');
+            s.push('<circle cx="0" cy="0" r="12" fill="' + (valid ? ACC : '#777') + '"/>');
+            /* Glas */
+            s.push('<g clip-path="url(#gDiscrpm)"><ellipse cx="-120" cy="-260" rx="340" ry="150" transform="rotate(-24 -120 -260)" fill="url(#gGlarerpm)"/></g>');
+            s.push('</g></svg>');
+            return s.join('');
+            ]]]
+    - type: grid
+      cards:
+      - type: heading
+        heading: Motor
+        heading_style: subtitle
+        icon: mdi:engine
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_kuhlmitteltemperatur
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_kuhlmitteltemperatur
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_kuhlmitteltemperatur'); return Number.isFinite(v) ? Math.round(v) : '--'; })();
+            const col = (() => { const v = num('sensor.pepper_ducato_obd_ble_kuhlmitteltemperatur'); return !Number.isFinite(v) ? '#777777' : v < 60 ? '#5aa7ff' : v >= 110 ? '#ff5d69' : p.accent; })();
+            const sub = '';
+            return `
+              <div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 4px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <div style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:1.5px;color:${p.muted};text-transform:uppercase;white-space:nowrap;">
+                    <ha-icon icon="mdi:coolant-temperature" style="--mdc-icon-size:16px;color:${p.muted};"></ha-icon>Kühlmittel
+                  </div>
+                  <div style="font-size:12px;font-weight:700;color:${p.soft};white-space:nowrap;">${sub}</div>
+                </div>
+                <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;line-height:1;margin-top:4px;">
+                  <span style="font-size:58px;font-weight:800;letter-spacing:-2.5px;color:${col};text-shadow:0 0 20px ${col}35;">${value}</span>
+                  <span style="font-size:15px;font-weight:800;letter-spacing:1.5px;color:${p.muted};">°C</span>
+                </div>
+              </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 120px
+          - border-radius: 22px
+          - padding: 10px 16px
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: 2
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_oltemperatur
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_oltemperatur
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_oltemperatur'); return Number.isFinite(v) ? Math.round(v) : '--'; })();
+            const col = (() => { const v = num('sensor.pepper_ducato_obd_ble_oltemperatur'); return !Number.isFinite(v) ? '#777777' : v < 60 ? '#5aa7ff' : v > 125 ? '#ff5d69' : p.accent; })();
+            const sub = '';
+            return `
+              <div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 4px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <div style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:1.5px;color:${p.muted};text-transform:uppercase;white-space:nowrap;">
+                    <ha-icon icon="mdi:oil-temperature" style="--mdc-icon-size:16px;color:${p.muted};"></ha-icon>Öltemperatur
+                  </div>
+                  <div style="font-size:12px;font-weight:700;color:${p.soft};white-space:nowrap;">${sub}</div>
+                </div>
+                <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;line-height:1;margin-top:4px;">
+                  <span style="font-size:58px;font-weight:800;letter-spacing:-2.5px;color:${col};text-shadow:0 0 20px ${col}35;">${value}</span>
+                  <span style="font-size:15px;font-weight:800;letter-spacing:1.5px;color:${p.muted};">°C</span>
+                </div>
+              </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 120px
+          - border-radius: 22px
+          - padding: 10px 16px
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: 2
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_kilometerstand
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_kilometerstand
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_kilometerstand'); return Number.isFinite(v) ? Math.round(v).toLocaleString('de-DE') : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_kilometerstand'); return Number.isFinite(v) ? p.accent : p.inactive; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:counter" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">Kilometerstand</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">km</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_tageskilometer
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_tageskilometer
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_tageskilometer'); return Number.isFinite(v) ? Math.round(v).toLocaleString('de-DE') : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_tageskilometer'); return Number.isFinite(v) ? p.accent : p.inactive; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:map-marker-distance" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">Tageskilometer</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">km</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
+        hold_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.pepper_ducato_obd_ble_tageskilometer_zurucksetzen
+          haptic: medium
+          confirmation:
+            text: Tageskilometer auf 0 setzen?
+    - type: grid
+      cards:
+      - type: heading
+        heading: AdBlue & Umgebung
+        heading_style: subtitle
+        icon: mdi:thermometer
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_adblue_temperatur
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_adblue_temperatur
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_adblue_temperatur'); return Number.isFinite(v) ? de(v, 0) : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_adblue_temperatur'); return !Number.isFinite(v) ? p.inactive : v <= -5 ? '#5aa7ff' : p.accent; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:snowflake-thermometer" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">AdBlue Temp.</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">°C</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_adblue_konzentration
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_adblue_konzentration
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_adblue_konzentration'); return Number.isFinite(v) ? de(v, 1) : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_adblue_konzentration'); return !Number.isFinite(v) ? p.inactive : (v < 31.8 || v > 33.2) ? '#ffb52e' : '#32d74b'; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:flask-outline" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">AdBlue Qualität</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">%</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_aussentemperatur
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_aussentemperatur
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_aussentemperatur'); return Number.isFinite(v) ? de(v, 0) : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_aussentemperatur'); return !Number.isFinite(v) ? p.inactive : v <= 3 ? '#5aa7ff' : v >= 30 ? '#ff5d69' : p.accent; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:thermometer" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">Außen</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">°C</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
+      - type: custom:button-card
+        show_icon: false
+        show_name: false
+        show_state: false
+        triggers_update:
+        - sensor.pepper_ducato_obd_ble_luftdruck
+        - sun.sun
+        - input_select.cockpit_farbschema
+        tap_action:
+          action: more-info
+          entity: sensor.pepper_ducato_obd_ble_luftdruck
+        custom_fields:
+          c: |-
+            [[[
+            const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+            const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+            const p = lightMode ? {
+              accent: '#b96b00', accentAlt: '#874900', text: '#30251a', soft: '#554632', muted: '#79684f',
+              track: '#e2d1b7', inactive: '#a89070'
+            } : {
+              accent: '#ff9f0a', accentAlt: '#a84f00', text: '#f0e4d4', soft: '#d0c2af', muted: '#c9b79e',
+              track: '#292117', inactive: '#a89070'
+            };
+            const num = (id) => { const s = states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : NaN; };
+            const de = (v, d) => v.toFixed(d).replace('.', ',');
+            const value = (() => { const v = num('sensor.pepper_ducato_obd_ble_luftdruck'); return Number.isFinite(v) ? de(v, 0) : '--'; })();
+            const color = (() => { const v = num('sensor.pepper_ducato_obd_ble_luftdruck'); return Number.isFinite(v) ? p.accent : p.inactive; })();
+            return `<div style="display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;padding:0 14px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:${color}22;border:1px solid ${color}66;">
+                <ha-icon icon="mdi:gauge" style="--mdc-icon-size:19px;color:${color};"></ha-icon>
+              </div>
+              <div style="min-width:0;line-height:1;">
+                <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${p.muted};white-space:nowrap;text-transform:uppercase;">Luftdruck</div>
+                <div style="margin-top:4px;white-space:nowrap;font-size:21px;font-weight:800;letter-spacing:-.5px;color:${p.text};">${value}<span style="font-size:12px;font-weight:700;color:${p.muted};margin-left:3px;letter-spacing:0;">hPa</span></div>
+              </div>
+            </div>`;
+            ]]]
+        styles:
+          card:
+          - height: 64px
+          - border-radius: 18px
+          - padding: '0'
+          - box-sizing: border-box
+          - background: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? 'linear-gradient(145deg, #fffaf2 0%, #f0e2cf 100%)' : 'linear-gradient(145deg, #221c16 0%, #12100d 100%)';
+              ]]]
+          - border: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '1px solid rgba(185,107,0,.30)' : '1px solid rgba(255,159,10,.22)';
+              ]]]
+          - box-shadow: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '0 4px 16px rgba(80,45,0,.10)' : '0 4px 16px rgba(0,0,0,.24)';
+              ]]]
+          - color: |-
+              [[[
+              const mode = states['input_select.cockpit_farbschema']?.state || 'Automatisch';
+              const lightMode = mode === 'Hell' || (mode === 'Automatisch' && states['sun.sun']?.state === 'above_horizon');
+              return lightMode ? '#30251a' : '#f0e4d4';
+              ]]]
+          grid:
+          - grid-template-areas: '"c"'
+          - grid-template-columns: minmax(0, 1fr)
+          - grid-template-rows: 1fr
+          custom_fields:
+            c:
+            - width: 100%
+            - height: 100%
+        grid_options:
+          columns: 6
+          rows: auto
